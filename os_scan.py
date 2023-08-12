@@ -15,22 +15,31 @@ import time
 
 """
 Created a cmd-line cmd to get the installed packages with their installation dates as available by the logs:
-  Debian: `for x in $(ls -1 /var/log/dpkg.log*); do zcat -f $x | tac | grep -e " install " -e " upgrade "; done | awk -F" " '{print $1 "\t" $2 "\t" $4 "\t" $6}'`
+  Debian: `for x in $(ls -1 /var/log/dpkg.log*); do zcat -f $x | tac | grep -e " install " -e " upgrade "; done | awk -F" " '{print $1 " " $2 "\t" $4 "\t" $6}'`
     - Go through all of the dpkg log files available
     - Reverse cat through them
     - Grep for install or upgrade
     - Awk for only the date, time, name, latest-version columns
   **Note: there is a limitation to this as debian may use rolling logs and does not maintain all installation data as seen in `dpkg-query -l`**
   
-  CentOS: centOS uses rpm which maintains the installtime so the cmd is `rpm -qa --queryformat '%{installtime:date} \t %{installtime} \t %{name} \t %{version}\n' | sort -n`
+  CentOS: centOS uses rpm which maintains the installtime so the cmd is `rpm -qa --queryformat '%{installtime:date} \t %{name} \t %{version}\n' | sort -n`
 """
 def get_system_packages():
-  # Write the output to a csv file for easier parsing
-  subprocess.check_output("for x in $(ls -1 /var/log/dpkg.log*); do zcat -f $x | tac | grep -e \" install \" -e \" upgrade \"; done | awk -F\" \" '{print $1 \"\t\" $2 \"\t\" $4 \"\t\" $6}' > sys_packages.csv", shell=True, text=True)
+  # Figure out which OS to parse
+  distro = "CENTOS" if os.path.exists('/etc/redhat-release') else "DEBIAN"
+
+
+  if distro == "CENTOS":
+    subprocess.check_output("rpm -qa --queryformat '%{installtime:date} \t %{name} \t %{version}\n' | sort -n > sys_packages.csv", shell=True, text=True)
+  elif distro == "DEBIAN":
+    subprocess.check_output("for x in $(ls -1 /var/log/dpkg.log*); do zcat -f $x | tac | grep -e \" install \" -e \" upgrade \"; done | awk -F\" \" '{print $1 \" \" $2 \"\t\" $4 \"\t\" $6}' > sys_packages.csv", shell=True, text=True)
+  else: 
+    print("ERROR PLEASE USE A DEBIAN OR CENTOS OPERATING SYSTEM")
+
 
   # Pandas has a max_rows=10 default that we need to override
   pandas.set_option('display.max_rows', None)
-  sys_packages = DataFrame(pandas.read_csv("sys_packages.csv", sep='\t', names=["Date", "Time", "Package Name", "Version"])).to_markdown() 
+  sys_packages = DataFrame(pandas.read_csv("sys_packages.csv", sep='\t', names=["Date & Time", "Package Name", "Version"])).to_markdown() 
 
   # Print the pandas dataframe output
   print("#####################################################################################################################################")
